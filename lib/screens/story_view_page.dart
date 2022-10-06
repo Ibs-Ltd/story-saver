@@ -1,0 +1,459 @@
+import 'package:flutter/material.dart';
+import 'package:story_saver/Widgets/custom_text_view.dart';
+import 'package:story_saver/models/story_model.dart';
+import 'package:story_saver/models/user_model.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:story_saver/utils/app_colors.dart';
+
+class StoryScreen extends StatefulWidget {
+  final List<Story> stories;
+
+  const StoryScreen({required this.stories});
+
+  @override
+  _StoryScreenState createState() => _StoryScreenState();
+}
+
+class _StoryScreenState extends State<StoryScreen>
+    with SingleTickerProviderStateMixin {
+  late PageController _pageController;
+  late AnimationController _animController;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _animController = AnimationController(vsync: this);
+
+    final Story firstStory = widget.stories.first;
+    _loadStory(story: firstStory, animateToPage: false);
+
+    _animController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _animController.stop();
+        _animController.reset();
+        setState(() {
+          if (_currentIndex + 1 < widget.stories.length) {
+            _currentIndex += 1;
+            _loadStory(story: widget.stories[_currentIndex]);
+          } else {
+            // Out of bounds - loop story
+            // You can also Navigator.of(context).pop() here
+            _currentIndex = 0;
+            _loadStory(story: widget.stories[_currentIndex]);
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Story story = widget.stories[_currentIndex];
+    return SafeArea(
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: GestureDetector(
+          onTapDown: (details) => _onTapDown(details, story),
+          child: Stack(
+            children: <Widget>[
+              PageView.builder(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: widget.stories.length,
+                itemBuilder: (context, i) {
+                  final Story story = widget.stories[i];
+                  switch (story.media) {
+                    case MediaType.image:
+                      return Column(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: MediaQuery.of(context).size.width - 80,
+                              width: MediaQuery.of(context).size.width,
+                              child: CachedNetworkImage(
+                                imageUrl: story.url,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            height: 80,
+                            color: AppColors.appLightGrey,
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  InkWell(
+                                    onTap: () {
+                                      //download tap will go here
+                                    },
+                                    child: Container(
+                                        width: 120,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                            color: AppColors.appButtonColor,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                  color: Colors.grey
+                                                      .withOpacity(0.3),
+                                                  blurRadius: 8,
+                                                  spreadRadius: 3,
+                                                  offset: const Offset(0, 4)),
+                                            ]),
+                                        child: Center(
+                                          child: AppTextView(
+                                            text: "Download",
+                                            size: 12,
+                                            color: AppColors.appWhite,
+                                          ),
+                                        )),
+                                  ),
+                                  const SizedBox(
+                                    width: 10,
+                                  ),
+                                  InkWell(
+                                    onTap: () {
+                                      _addToList();
+                                    },
+                                    child: Container(
+                                        width: 120,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                            color: AppColors.appButtonColor2,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                  color: Colors.grey
+                                                      .withOpacity(0.3),
+                                                  blurRadius: 8,
+                                                  spreadRadius: 3,
+                                                  offset: const Offset(0, 4)),
+                                            ]),
+                                        child: Center(
+                                          child: AppTextView(
+                                            text: "Add to List",
+                                            size: 12,
+                                            color: AppColors.appWhite,
+                                          ),
+                                        )),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        ],
+                      );
+                    case MediaType.video:
+                      // TODO: Handle this case.
+                      break;
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+              Positioned(
+                top: 20.0,
+                left: 10.0,
+                right: 10.0,
+                child: Column(
+                  children: <Widget>[
+                    Row(
+                      children: widget.stories
+                          .asMap()
+                          .map((i, e) {
+                            return MapEntry(
+                              i,
+                              AnimatedBar(
+                                animController: _animController,
+                                position: i,
+                                currentIndex: _currentIndex,
+                              ),
+                            );
+                          })
+                          .values
+                          .toList(),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 1.5,
+                        vertical: 10.0,
+                      ),
+                      child: UserInfo(user: story.user),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  _addToList() {
+    // Initial Selected Value
+    String dropdownvalue = 'List #1';
+
+    // List of items in our dropdown menu
+    var items = [
+      'List #1',
+      'List #2',
+      'List #3',
+      'List #4',
+    ];
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            height: 180,
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.grey.withOpacity(0.3),
+                      blurRadius: 8,
+                      spreadRadius: 3,
+                      offset: const Offset(0, 4)),
+                ]),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AppTextView(
+                    text: "Add to List",
+                    size: 20,
+                    color: AppColors.appDarkGrey),
+                const SizedBox(
+                  height: 10,
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 15),
+                  padding: const EdgeInsets.symmetric(horizontal: 8,vertical: 3),
+                  height: 35,
+                  width: MediaQuery.of(context).size.width,
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(5),
+                      border:
+                          Border.all(color: AppColors.appDarkGrey, width: 1)),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton(
+                      value: dropdownvalue,
+                      icon: const Icon(Icons.arrow_drop_down_sharp,color: Colors.black,),
+                      items: items.map((String items) {
+                        return DropdownMenuItem(
+                          value: items,
+                          child: Text(items),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          //selected value will be fetched here
+                          dropdownvalue = newValue!;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(
+                  height: 15,
+                ),
+                InkWell(
+                  onTap: () {
+                    //createList code will go here
+                  },
+                  child: Container(
+                      padding:
+                          const EdgeInsets.only(top: 3, bottom: 3, left: 3),
+                      height: 35,
+                      width: MediaQuery.of(context).size.width / 3,
+                      decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(5),
+                          color: AppColors.appButtonColor2),
+                      child: Center(
+                          child: AppTextView(
+                        text: "Add",
+                        size: 15,
+                        color: AppColors.appWhite,
+                      ))),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _onTapDown(TapDownDetails details, Story story) {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double dx = details.globalPosition.dx;
+    if (dx < screenWidth / 3) {
+      setState(() {
+        if (_currentIndex - 1 >= 0) {
+          _currentIndex -= 1;
+          _loadStory(story: widget.stories[_currentIndex]);
+        }
+      });
+    } else if (dx > 2 * screenWidth / 3) {
+      setState(() {
+        if (_currentIndex + 1 < widget.stories.length) {
+          _currentIndex += 1;
+          _loadStory(story: widget.stories[_currentIndex]);
+        } else {
+          // Out of bounds - loop story
+          // You can also Navigator.of(context).pop() here
+          _currentIndex = 0;
+          _loadStory(story: widget.stories[_currentIndex]);
+        }
+      });
+    } else {
+      //handle video here
+    }
+  }
+
+  void _loadStory({required Story story, bool animateToPage = true}) {
+    _animController.stop();
+    _animController.reset();
+    switch (story.media) {
+      case MediaType.image:
+        _animController.duration = story.duration;
+        _animController.forward();
+        break;
+      case MediaType.video:
+        // _videoController.dispose();
+        // _videoController = VideoPlayerController.network(story.url)
+        //   ..initialize().then((_) {
+        //     setState(() {});
+        //     if (_videoController.value.isInitialized) {
+        //       _animController.duration = _videoController.value.duration;
+        //       _videoController.play();
+        //       _animController.forward();
+        //     }
+        //   });
+        break;
+    }
+    if (animateToPage) {
+      _pageController.animateToPage(
+        _currentIndex,
+        duration: const Duration(milliseconds: 1),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+}
+
+class AnimatedBar extends StatelessWidget {
+  final AnimationController animController;
+  final int position;
+  final int currentIndex;
+
+  const AnimatedBar({
+    Key? key,
+    required this.animController,
+    required this.position,
+    required this.currentIndex,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Flexible(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1.5),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              children: <Widget>[
+                _buildContainer(
+                  double.infinity,
+                  position < currentIndex
+                      ? Colors.white
+                      : Colors.white.withOpacity(0.5),
+                ),
+                position == currentIndex
+                    ? AnimatedBuilder(
+                        animation: animController,
+                        builder: (context, child) {
+                          return _buildContainer(
+                            constraints.maxWidth * animController.value,
+                            Colors.white,
+                          );
+                        },
+                      )
+                    : const SizedBox.shrink(),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Container _buildContainer(double width, Color color) {
+    return Container(
+      height: 4.0,
+      width: width,
+      decoration: BoxDecoration(
+        color: color,
+        border: Border.all(
+          color: Colors.black26,
+          width: 0.8,
+        ),
+        borderRadius: BorderRadius.circular(3.0),
+      ),
+    );
+  }
+}
+
+class UserInfo extends StatelessWidget {
+  final User user;
+
+  const UserInfo({
+    Key? key,
+    required this.user,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        CircleAvatar(
+          radius: 20.0,
+          backgroundColor: Colors.grey[300],
+          backgroundImage: CachedNetworkImageProvider(
+            user.profileImageUrl,
+          ),
+        ),
+        const SizedBox(width: 10.0),
+        Expanded(
+            child: AppTextView(
+          text: "${user.name} 3h",
+          size: 15,
+          color: AppColors.appWhite,
+        )),
+        IconButton(
+          icon: const Icon(
+            Icons.close,
+            size: 30.0,
+            color: Colors.white,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
+  }
+}
